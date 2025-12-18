@@ -19,13 +19,18 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req LoginRequest
-	json.NewDecoder(r.Body).Decode(&req)
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		http.Error(w, "invalid request format", http.StatusBadRequest)
+		return
+	}
 
 	if req.Username == "" || req.Password == "" {
 		http.Error(w, "username or password empty", http.StatusBadRequest)
 		return
 	}
 
+	// 这里调用 db 层校验
 	ok, err := db.CheckPassword(req.Username, req.Password)
 	if err != nil {
 		http.Error(w, "database error", http.StatusInternalServerError)
@@ -37,10 +42,9 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 设置 Cookie 标识用户
 	http.SetCookie(w, &http.Cookie{
 		Name:  "session",
-		Value: req.Username, // 简单版，直接存用户名
+		Value: req.Username,
 		Path:  "/",
 	})
 

@@ -16,17 +16,32 @@ func InitDB() {
 		log.Fatal(err)
 	}
 
+	// 创建 users 表
 	createUserTable := `
 	CREATE TABLE IF NOT EXISTS users (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		username TEXT UNIQUE NOT NULL,
-		password TEXT NOT NULL,
+		password_hash TEXT NOT NULL,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);`
 
 	_, err = DB.Exec(createUserTable)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Create users table error:", err)
+	}
+
+	// 创建 messages 表
+	createMessageTable := `
+	CREATE TABLE IF NOT EXISTS messages (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		sender TEXT NOT NULL,
+		content TEXT NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);`
+
+	_, err = DB.Exec(createMessageTable)
+	if err != nil {
+		log.Fatal("Create messages table error:", err)
 	}
 
 	log.Println("Database initialized")
