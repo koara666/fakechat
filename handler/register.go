@@ -1,66 +1,60 @@
 package handler
 
 import (
-	"database/sql"
+	"encoding/json"
 	"log"
 	"net/http"
 
 	"fakechat/db"
 )
 
+type RegisterRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
 func Register(w http.ResponseWriter, r *http.Request) {
-	// 1. 只允许 POST
+	// 1. 确保是 POST
 	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		w.Write([]byte("Only POST allowed"))
+		http.Error(w, "Only POST allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// 2. 取参数
-	username := r.FormValue("username")
-	password := r.FormValue("password")
-
-	if username == "" || password == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("username or password empty"))
-		return
-	}
-
-	// 3. 检查用户名是否存在
-	var id int
-	err := db.DB.QueryRow(
-		"SELECT id FROM users WHERE username = ?",
-		username,
-	).Scan(&id)
-
-	if err == nil {
-		// 能查到，说明用户名已存在
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("username already exists"))
-		return
-	}
-
-	if err != sql.ErrNoRows {
-		// 发生了其他数据库错误
-		log.Println("query user error:", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("internal error"))
-		return
-	}
-
-	// 4. 插入新用户
-	_, err = db.DB.Exec(
-		"INSERT INTO users (username, password_hash) VALUES (?, ?)",
-		username,
-		password,
-	)
+	// 2. 解析 JSON body
+	var req RegisterRequest
+	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		log.Println("insert user error:", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("register failed"))
+		log.Println("decode json error:", err)
+		http.Error(w, "invalid request format", http.StatusBadRequest)
 		return
 	}
 
-	// 5. 成功
+	// 3. 简单参数校验
+	if req.Username == "" || req.Password == "" {
+		http.Error(w, "username or password empty", http.StatusBadRequest)
+		return
+	}
+
+	// 4. 使用 db 层检查用户是否存在
+	exists, err := db.UserExists(req.Username)
+	if err != nil {
+		http.Error(w, "database error", http.StatusInternalServerError)
+		return
+	}
+	if exists {
+		http.Error(w, "username already exists", http.StatusBadRequest)
+		return
+	}
+
+	// 5. 使用 db 层创建用户
+	err = db.CreateUser(req.Username, req.Password)
+	if err != nil {
+		log.Println("CreateUser error:", err)
+		http.Error(w, "register failed", http.StatusInternalServerError)
+		return
+	}
+
+	// 6. 成功返回
+	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte("register success"))
 }

@@ -14,6 +14,7 @@ func main() {
 
 	// 2. 注册路由
 	http.HandleFunc("/register", handler.Register)
+	http.HandleFunc("/login", handler.Login) // 新增登录路由
 
 	// 3. 启动 HTTP 服务器
 	log.Println("Server started at :8080")
